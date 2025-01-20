@@ -5,27 +5,40 @@
 #include <cstdint>
 #include <iostream>
 
-struct run {
-  struct run *next;
+
+kmem_struct kmem = {
+    kmem.freelist_head = 0,
+    kmem.freelist_tail = 0,
+    kmem.freelist_cnt  = 0,
+    kmem.vstart        = nullptr,
+    kmem.vend          = nullptr,
+    kmem.first_in      = nullptr,
+    kmem.ivcnt         = nullptr
 };
 
-struct {
-  struct run *freelist_head;
-  struct run *freelist_tail;
-  int freelist_cnt = 0;
-} kmem;
-
 void
-freerange(void *vstart,void *vend)
+freerange(page *vstart,page *vend, int gccode)
 {
-  char *p;
+  page *p;
   struct run *r;
-  p = (char*)vstart;
 
-  kmem.freelist_head = 0;
-  kmem.freelist_tail = 0;
+  kmem.vstart = vstart;
+  kmem.vend = vend;
+  p = vstart;
+  switch(gccode){
+    case 0:
+      kmem.first_in = vstart;
+      break;
+    case 1:
+      int* ivcnt = new int[param::physical_dev_size/param::block_size];
+      for (std::size_t i = 0; i < (param::physical_dev_size/param::block_size); i++){
+      ivcnt[i] = 0;
+      }
+      kmem.ivcnt = ivcnt;
+      break;
+  }
 
-  for(; p < vend; p += sizeof(page)*(param::block_size/param::page_size)){
+  for(; p < vend; p += param::page_per_block){
     r = (struct run*)p;
     kmem.freelist_cnt ++;
     r->next = 0;
@@ -40,13 +53,12 @@ freerange(void *vstart,void *vend)
   }
 }
 
-char*
-kalloc(){
-  if (kmem.freelist_head == 0)
+page*
+kalloc(int gccode){
+  if (kmem.freelist_head == 0)  //empty freelist
     return 0;
-  if (kmem.freelist_cnt <= 4){
-    std::cout<<"Garbage Collection Trigger"<<std::endl;
-    return 0;
+  if (kmem.freelist_cnt <= 4){  //gc on
+    return gc(gccode);
   }
 
   struct run *r = kmem.freelist_head;
@@ -56,11 +68,11 @@ kalloc(){
   if(kmem.freelist_head == 0)
     kmem.freelist_tail = 0;
 
-  return (char *)r;
+  return reinterpret_cast<page*>(r);
 }
 
 void
-kfree(char *v){
+kfree(page *v){
   struct run *r = (struct run*)v;
   r->next = 0;
   kmem.freelist_cnt ++;

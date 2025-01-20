@@ -18,4 +18,5 @@ namespace param{
     constexpr std::uint64_t mapping_table_size = logical_dev_size/4096;
     constexpr std::uint64_t iv_table_size = physical_dev_size/4096;
     constexpr std::uint64_t op = logical_dev_size / physical_dev_size;  //overprovisioning
+    constexpr std::uint64_t page_per_block = block_size / page_size;
 }
